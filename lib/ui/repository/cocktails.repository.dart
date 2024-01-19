@@ -1,0 +1,3 @@
+class CocktailRepository {
+  CocktailRepository() {}
+}
