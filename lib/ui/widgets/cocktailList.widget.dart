@@ -2,9 +2,11 @@ import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:tp_cocktail/ui/widgets/customImage.widget.dart';
 
 import '../../data/models/cocktail.model.dart';
 import '../pages/CocktailDetail.page.dart';
+import '../utils/string_formatter.dart';
 
 class CocktailList extends StatelessWidget {
   final List<Cocktail> cocktails;
@@ -22,19 +24,12 @@ class CocktailList extends StatelessWidget {
           width: 320,
           child: Center(
             child: ListTile(
-              leading: cocktail.image != null
-                  ? cocktail.image!.startsWith("https")
-                      ? Image.network(cocktail.image!)
-                      : Image.memory(
-                          Uint8List.fromList(cocktail.image!.codeUnits))
-                  : Image.asset('lib/data/assets/landscape-placeholder.png'),
+              leading: CustomImage(image: cocktail.image),
               title: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(cocktail.name.length > 15
-                      ? "${cocktail.name.substring(0, 15)}..."
-                      : cocktail.name),
-                  if (cocktail.length != null && cocktail.length! >= -1)
+                  Text(StringFormatter.format(cocktail.name, 15)),
+                  if (cocktail.length != null && cocktail.length! > -1)
                     Text(
                       '${cocktail.length} min',
                       style:
@@ -42,9 +37,7 @@ class CocktailList extends StatelessWidget {
                     ),
                 ],
               ),
-              subtitle: Text(cocktail.description != null
-                  ? "${cocktail.description!.substring(0, 50)}..."
-                  : ""),
+              subtitle: Text(StringFormatter.format(cocktail.description, 50)),
               onTap: () {
                 Navigator.push(
                   context,

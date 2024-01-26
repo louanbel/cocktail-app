@@ -40,14 +40,14 @@ class CustomAlertDialog extends StatelessWidget {
           child: Text(defaultActionText),
           onPressed: () {
             onPressedAction();
-            final snackback = SnackBar(
+            final snackbar = SnackBar(
               content: Text(confirmationText),
               action: SnackBarAction(
                 label: 'Ok',
                 onPressed: () {},
               ),
             );
-            ScaffoldMessenger.of(context).showSnackBar(snackback);
+            ScaffoldMessenger.of(context).showSnackBar(snackbar);
           },
         ),
       ],

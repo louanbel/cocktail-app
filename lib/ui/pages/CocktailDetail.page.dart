@@ -7,6 +7,9 @@ import 'package:tp_cocktail/data/models/cocktail.model.dart';
 import 'package:tp_cocktail/ui/widgets/customAlertDialog.widget.dart';
 
 import '../cubits/cocktails.cubit.dart';
+import '../cubits/cocktails.state.dart';
+import '../cubits/cubit.state.dart';
+import '../widgets/customImage.widget.dart';
 import 'CocktailForm.page.dart';
 
 class CocktailDetail extends StatefulWidget {
@@ -71,124 +74,117 @@ class _CocktailDetailState extends State<CocktailDetail> {
   Widget build(BuildContext context) {
     final cocktailListCubit = BlocProvider.of<CocktailListCubit>(context);
 
-    return BlocListener<CocktailListCubit, List<Cocktail>>(
-        listener: (BuildContext context, List<Cocktail> state) {
-          setState(() {
-            cocktail = state.firstWhere((c) => c.id == widget.cocktail.id);
-          });
-        },
-        child: Scaffold(
-            appBar: AppBar(
-              title: Text(cocktail.name),
-              actions: [
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      cocktail.isFavorite = !cocktail.isFavorite;
-                    });
-                    cocktailListCubit.setIsFavorite(widget.cocktail.id);
-                  },
-                  icon: Icon(cocktail.isFavorite
-                      ? Icons.favorite
-                      : Icons.favorite_border),
-                ),
-              ],
+    return Scaffold(
+        appBar: AppBar(
+          title: Text(cocktail.name),
+          actions: [
+            IconButton(
+              onPressed: () {
+                setState(() {
+                  cocktail.isFavorite = !cocktail.isFavorite;
+                });
+                cocktailListCubit.setIsFavorite(widget.cocktail.id);
+              },
+              icon: Icon(
+                  cocktail.isFavorite ? Icons.favorite : Icons.favorite_border),
             ),
-            body: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Column(children: [
-                      if (cocktail.image != null)
-                        Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: cocktail.image != null
-                                ? cocktail.image!.startsWith("https") ? Image.network(cocktail.image!, width: 200, height: 200) : Image.memory(Uint8List.fromList(cocktail.image!.codeUnits), height: 200, width: 200)
-                                : Image.asset(
-                                    'lib/data/assets/landscape-placeholder.png')),
-                      if (cocktail.length != null && cocktail.length! >= -1)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFD8EAFF),
-                            border: Border.all(
-                              color: const Color(0xFFD8EAFF),
-                              width: 2,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            "${cocktail.length} min",
-                            style: const TextStyle(
-                                fontSize: 20, color: Color(0xFF3790FD)),
-                          ),
-                        )
-                    ]),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        const Text("Ingredients",
-                            style: TextStyle(fontSize: 20)),
-                        IconButton(
-                            onPressed: () {
-                              cocktailListCubit.sendIngredientList(cocktail.id);
-                            },
-                            icon: const Icon(Icons.share))
-                      ]),
-                      for (var ingredient in cocktail.ingredients)
-                        Text(
-                            ' - ${ingredient.name} (${ingredient.quantity} ${ingredient.unit})'),
-                    ],
-                  ),
-                  if (cocktail.description != null)
+          ],
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Column(children: [
+                  if (cocktail.image != null)
                     Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text("Description",
-                              style: TextStyle(fontSize: 20)),
-                          Text(cocktail.description!),
-                        ],
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: CustomImage(image: cocktail.image, width: 200, height: 200)),
+                  if (cocktail.length != null && cocktail.length! >= -1)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD8EAFF),
+                        border: Border.all(
+                          color: const Color(0xFFD8EAFF),
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        "${cocktail.length} min",
+                        style: const TextStyle(
+                            fontSize: 20, color: Color(0xFF3790FD)),
                       ),
                     )
+                ]),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    const Text("Ingredients", style: TextStyle(fontSize: 20)),
+                    IconButton(
+                        onPressed: () {
+                          cocktailListCubit.sendIngredientList(cocktail.id);
+                        },
+                        icon: const Icon(Icons.share))
+                  ]),
+                  for (var ingredient in cocktail.ingredients)
+                    Text(
+                        ' - ${ingredient.name} (${ingredient.quantity} ${ingredient.unit})'),
                 ],
               ),
-            ),
-            floatingActionButton: SpeedDial(icon: Icons.menu, children: [
-              SpeedDialChild(
-                label: "Edit",
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CocktailForm(
-                        existingCocktail: cocktail,
-                      ),
-                    ),
-                  );
-                },
-                child: const Icon(Icons.edit),
-              ),
-              SpeedDialChild(
-                label: "Duplicate",
-                onTap: () {
-                  _showDuplicateConfirmationDialog(cocktailListCubit);
-                },
-                child: const Icon(Icons.copy),
-              ),
-              SpeedDialChild(
-                label: "Delete",
-                onTap: () {
-                  _showDeleteConfirmationDialog(cocktailListCubit);
-                },
-                child: const Icon(Icons.delete),
-              ),
-            ])));
+              if (cocktail.description != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Description", style: TextStyle(fontSize: 20)),
+                      Text(cocktail.description!),
+                    ],
+                  ),
+                )
+            ],
+          ),
+        ),
+        floatingActionButton: SpeedDial(icon: Icons.menu, children: [
+          SpeedDialChild(
+            label: "Edit",
+            onTap: () async {
+              final editedCocktail = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CocktailForm(
+                    existingCocktail: cocktail,
+                  ),
+                ),
+              );
+              if (editedCocktail != null) {
+                setState(() {
+                  cocktail = editedCocktail;
+                });
+              }
+            },
+            child: const Icon(Icons.edit),
+          ),
+          SpeedDialChild(
+            label: "Duplicate",
+            onTap: () {
+              _showDuplicateConfirmationDialog(cocktailListCubit);
+            },
+            child: const Icon(Icons.copy),
+          ),
+          SpeedDialChild(
+            label: "Delete",
+            onTap: () {
+              _showDeleteConfirmationDialog(cocktailListCubit);
+            },
+            child: const Icon(Icons.delete),
+          ),
+        ]));
   }
 }

@@ -6,65 +6,100 @@ import 'dart:typed_data';
 import 'dart:io';
 import 'package:flutter_sms/flutter_sms.dart';
 
-class CocktailListCubit extends Cubit<List<Cocktail>> {
+import 'cocktails.state.dart';
+import 'cubit.state.dart';
+
+class CocktailListCubit extends Cubit<CocktailListState> {
   final Isar isar;
 
-  CocktailListCubit(this.isar) : super([]);
+  CocktailListCubit(this.isar)
+      : super(const LoadingState<CocktailListStateData>()) {
+    loadCocktails();
+  }
 
   void setIsFavorite(int cocktailId) async {
-    final fetchedCocktails = await isar.cocktails.get(cocktailId);
-    if (fetchedCocktails == null) {
-      return;
+    try {
+      final fetchedCocktails = await isar.cocktails.get(cocktailId);
+
+      if (fetchedCocktails == null) {
+        return;
+      }
+
+      fetchedCocktails.isFavorite = !fetchedCocktails.isFavorite;
+
+      await isar.writeTxn(() async {
+        isar.cocktails.put(fetchedCocktails);
+      });
+
+      loadCocktails();
+    } catch (e) {
+      emit(const FailureState<CocktailListStateData>(
+          message: "Error while trying to update favorites"));
+      if (kDebugMode) {
+        print(e);
+      }
     }
-
-    fetchedCocktails.isFavorite = !fetchedCocktails.isFavorite;
-
-    await isar.writeTxn(() async {
-      isar.cocktails.put(fetchedCocktails);
-    });
-
-    loadCocktails();
   }
 
   void deleteCocktail(int cocktailId) async {
-    await isar.writeTxn(() async {
-      isar.cocktails.delete(cocktailId);
-    });
+    try {
+      await isar.writeTxn(() async {
+        isar.cocktails.delete(cocktailId);
+      });
 
-    loadCocktails();
+      loadCocktails();
+    } catch (e) {
+      if (kDebugMode) {
+        print(e);
+      }
+    }
   }
 
   void duplicateCocktail(Cocktail cocktail) async {
-    final duplicatedCocktail = Cocktail(
-        name: cocktail.name,
-        length: cocktail.length,
-        description: cocktail.description,
-        ingredients: cocktail.ingredients,
-        isAlcoholic: cocktail.isAlcoholic,
-        image: cocktail.image,
-        isFavorite: cocktail.isFavorite);
+    try {
+      final duplicatedCocktail = Cocktail(
+          name: cocktail.name,
+          length: cocktail.length,
+          description: cocktail.description,
+          ingredients: cocktail.ingredients,
+          isAlcoholic: cocktail.isAlcoholic,
+          image: cocktail.image,
+          isFavorite: cocktail.isFavorite);
 
-    await isar.writeTxn(() async {
-      isar.cocktails.put(duplicatedCocktail);
-    });
+      await isar.writeTxn(() async {
+        isar.cocktails.put(duplicatedCocktail);
+      });
 
-    loadCocktails();
+      loadCocktails();
+    } catch (e) {
+      emit(const FailureState<CocktailListStateData>(
+          message: "Error while trying to duplicate cocktail"));
+      if (kDebugMode) {
+        print(e);
+      }
+    }
   }
 
-  void sendIngredientList(int cocktailId) async {
-    final fetchedCocktails = await isar.cocktails.get(cocktailId);
-    if (fetchedCocktails == null) {
-      return;
+  Future<String?> sendIngredientList(int cocktailId) async {
+    try {
+      final fetchedCocktails = await isar.cocktails.get(cocktailId);
+      if (fetchedCocktails == null) {
+        return null;
+      }
+
+      final message =
+          "Ingredients of ${fetchedCocktails.name}: \n${fetchedCocktails.ingredients.map((ingredient) => "  - ${ingredient.name} (${ingredient.quantity} ${ingredient.unit})").join("\n")}";
+
+      String result = await sendSMS(message: message, recipients: []);
+      if (kDebugMode) {
+        print(result);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error sending SMS");
+      }
     }
-
-    final message =
-        "Ingredients of ${fetchedCocktails.name}: \n${fetchedCocktails.ingredients.map((ingredient) => "  - ${ingredient.name} (${ingredient.quantity} ${ingredient.unit})").join("\n")}";
-
-    String result = await sendSMS(message: message, recipients: []);
-
-    if (kDebugMode) {
-      print(result);
-    }
+    return null;
   }
 
   void initializeDatabase() async {
@@ -72,11 +107,11 @@ class CocktailListCubit extends Cubit<List<Cocktail>> {
       Cocktail(
         name: "Margarita",
         description:
-            "Un cocktail classique à base de tequila, de liqueur d'orange et de jus de citron vert.",
+            "A classic cocktail made with tequila, orange liqueur, and lime juice.",
         ingredients: [
           Ingredient(name: "Tequila", quantity: 5.0, unit: "cl"),
           Ingredient(name: "Triple sec", quantity: 2.0, unit: "cl"),
-          Ingredient(name: "Jus de citron vert", quantity: 2.5, unit: "cl"),
+          Ingredient(name: "Lime juice", quantity: 2.5, unit: "cl"),
         ],
         image:
             "https://i.pinimg.com/originals/2d/4e/e6/2d4ee618e05cc6bff524bae855be9555.jpg",
@@ -86,13 +121,12 @@ class CocktailListCubit extends Cubit<List<Cocktail>> {
       Cocktail(
         name: "Mojito",
         description:
-            "Un rafraîchissant cocktail cubain à base de rhum, de menthe, de sucre et de citron vert.",
+            "A refreshing Cuban cocktail made with rum, mint leaves, sugar, and lime.",
         ingredients: [
-          Ingredient(name: "Rhum blanc", quantity: 5.0, unit: "cl"),
-          Ingredient(
-              name: "Feuilles de menthe fraîche", quantity: 6, unit: "u"),
-          Ingredient(name: "Sucre", quantity: 2.0, unit: "cl"),
-          Ingredient(name: "Jus de citron vert", quantity: 2.5, unit: "cl"),
+          Ingredient(name: "White rum", quantity: 5.0, unit: "cl"),
+          Ingredient(name: "Fresh mint leaves", quantity: 6, unit: "u"),
+          Ingredient(name: "Sugar", quantity: 2.0, unit: "cl"),
+          Ingredient(name: "Lime juice", quantity: 2.5, unit: "cl"),
         ],
         length: 10,
         image:
@@ -102,11 +136,11 @@ class CocktailListCubit extends Cubit<List<Cocktail>> {
       Cocktail(
         name: "Piña Colada",
         description:
-            "Un cocktail tropical à base de rhum, d'ananas et de lait de coco.",
+            "A tropical cocktail made with rum, pineapple, and coconut milk.",
         ingredients: [
-          Ingredient(name: "Rhum blanc", quantity: 5.0, unit: "cl"),
-          Ingredient(name: "Jus d'ananas", quantity: 9.0, unit: "cl"),
-          Ingredient(name: "Lait de coco", quantity: 3.0, unit: "cl"),
+          Ingredient(name: "White rum", quantity: 5.0, unit: "cl"),
+          Ingredient(name: "Pineapple juice", quantity: 9.0, unit: "cl"),
+          Ingredient(name: "Coconut milk", quantity: 3.0, unit: "cl"),
         ],
         length: 10,
         image:
@@ -115,12 +149,11 @@ class CocktailListCubit extends Cubit<List<Cocktail>> {
       ),
       Cocktail(
         name: "Daiquiri",
-        description:
-            "Un cocktail à base de rhum, de jus de citron vert et de sucre.",
+        description: "A cocktail made with rum, lime juice, and sugar.",
         ingredients: [
-          Ingredient(name: "Rhum blanc", quantity: 5.0, unit: "cl"),
-          Ingredient(name: "Jus de citron vert", quantity: 2.5, unit: "cl"),
-          Ingredient(name: "Sucre", quantity: 2.0, unit: "cl"),
+          Ingredient(name: "White rum", quantity: 5.0, unit: "cl"),
+          Ingredient(name: "Lime juice", quantity: 2.5, unit: "cl"),
+          Ingredient(name: "Sugar", quantity: 2.0, unit: "cl"),
         ],
         length: 10,
         image:
@@ -130,12 +163,12 @@ class CocktailListCubit extends Cubit<List<Cocktail>> {
       Cocktail(
         name: "Cosmopolitan",
         description:
-            "Un cocktail rafraîchissant à base de vodka, de triple sec, de jus de canneberge et de citron vert.",
+            "A refreshing cocktail made with vodka, triple sec, cranberry juice, and lime.",
         ingredients: [
           Ingredient(name: "Vodka", quantity: 4.0, unit: "cl"),
           Ingredient(name: "Triple sec", quantity: 1.5, unit: "cl"),
-          Ingredient(name: "Jus de canneberge", quantity: 1.5, unit: "cl"),
-          Ingredient(name: "Jus de citron vert", quantity: 0.5, unit: "cl"),
+          Ingredient(name: "Cranberry juice", quantity: 1.5, unit: "cl"),
+          Ingredient(name: "Lime juice", quantity: 0.5, unit: "cl"),
         ],
         length: 10,
         image:
@@ -148,12 +181,11 @@ class CocktailListCubit extends Cubit<List<Cocktail>> {
       Cocktail(
         name: "Virgin Mojito",
         description:
-            "Une version sans alcool du célèbre Mojito, avec de la menthe, du sucre et du citron vert.",
+            "A non-alcoholic version of the famous Mojito, with mint, sugar, and lime.",
         ingredients: [
-          Ingredient(
-              name: "Feuilles de menthe fraîche", quantity: 6, unit: "u"),
-          Ingredient(name: "Sucre", quantity: 2.0, unit: "cl"),
-          Ingredient(name: "Jus de citron vert", quantity: 2.5, unit: "cl"),
+          Ingredient(name: "Fresh mint leaves", quantity: 6, unit: "u"),
+          Ingredient(name: "Sugar", quantity: 2.0, unit: "cl"),
+          Ingredient(name: "Lime juice", quantity: 2.5, unit: "cl"),
         ],
         length: 15,
         image:
@@ -163,21 +195,21 @@ class CocktailListCubit extends Cubit<List<Cocktail>> {
       Cocktail(
         name: "Virgin Piña Colada",
         description:
-            "Une version sans alcool de la Piña Colada, avec de l'ananas et du lait de coco.",
+            "A non-alcoholic version of Piña Colada, with pineapple and coconut milk.",
         ingredients: [
-          Ingredient(name: "Jus d'ananas", quantity: 9.0, unit: "cl"),
-          Ingredient(name: "Lait de coco", quantity: 3.0, unit: "cl"),
+          Ingredient(name: "Pineapple juice", quantity: 9.0, unit: "cl"),
+          Ingredient(name: "Coconut milk", quantity: 3.0, unit: "cl"),
         ],
         isAlcoholic: false,
       ),
       Cocktail(
         name: "Virgin Mary",
         description:
-            "Une version sans alcool du Bloody Mary, avec du jus de tomate, du citron, de la sauce Worcestershire et des épices.",
+            "A non-alcoholic version of Bloody Mary, with tomato juice, lemon, Worcestershire sauce, and spices.",
         ingredients: [
-          Ingredient(name: "Jus de tomate", quantity: 9.0, unit: "cl"),
-          Ingredient(name: "Jus de citron", quantity: 1.5, unit: "cl"),
-          Ingredient(name: "Sauce Worcestershire", quantity: 1.0, unit: "cl"),
+          Ingredient(name: "Tomato juice", quantity: 9.0, unit: "cl"),
+          Ingredient(name: "Lemon juice", quantity: 1.5, unit: "cl"),
+          Ingredient(name: "Worcestershire sauce", quantity: 1.0, unit: "cl"),
         ],
         image:
             "https://www.thecocktaildb.com/images/media/drink/upgsue1668419912.jpg",
@@ -186,22 +218,21 @@ class CocktailListCubit extends Cubit<List<Cocktail>> {
       Cocktail(
         name: "Nojito",
         description:
-            "Une version sans alcool du Mojito, avec de la menthe, du sucre et du citron vert.",
+            "A non-alcoholic version of Mojito, with mint, sugar, and lime.",
         ingredients: [
-          Ingredient(
-              name: "Feuilles de menthe fraîche", quantity: 6, unit: "u"),
-          Ingredient(name: "Sucre", quantity: 2.0, unit: "cl"),
-          Ingredient(name: "Jus de citron vert", quantity: 2.5, unit: "cl"),
+          Ingredient(name: "Fresh mint leaves", quantity: 6, unit: "u"),
+          Ingredient(name: "Sugar", quantity: 2.0, unit: "cl"),
+          Ingredient(name: "Lime juice", quantity: 2.5, unit: "cl"),
         ],
         isAlcoholic: false,
       ),
       Cocktail(
         name: "Fruit Punch",
-        description: "Un mélange rafraîchissant de jus de fruits tropicaux.",
+        description: "A refreshing blend of tropical fruit juices.",
         ingredients: [
-          Ingredient(name: "Jus d'ananas", quantity: 5.0, unit: "cl"),
-          Ingredient(name: "Jus d'orange", quantity: 5.0, unit: "cl"),
-          Ingredient(name: "Jus de mangue", quantity: 5.0, unit: "cl"),
+          Ingredient(name: "Pineapple juice", quantity: 5.0, unit: "cl"),
+          Ingredient(name: "Orange juice", quantity: 5.0, unit: "cl"),
+          Ingredient(name: "Mango juice", quantity: 5.0, unit: "cl"),
         ],
         image:
             "https://www.thecocktaildb.com/images/media/drink/wyrsxu1441554538.jpg",
@@ -218,50 +249,66 @@ class CocktailListCubit extends Cubit<List<Cocktail>> {
 
   void loadCocktails() async {
     final fetchedCocktails = await isar.cocktails.where().findAll();
-    emit(fetchedCocktails);
+    emit(SuccessState<CocktailListStateData>(
+        data: CocktailListStateData(cocktails: fetchedCocktails)));
   }
 
   void updateCocktail(Id id, String name, int? length, String description,
       List<Ingredient> ingredients, bool isAlcoholic, File? imageFile) async {
     Cocktail? existingCocktail = await isar.cocktails.get(id);
+    try {
+      if (existingCocktail == null) {
+        return;
+      }
 
-    if (existingCocktail == null) {
-      return;
-    }
-    existingCocktail.name = name;
-    existingCocktail.length = length ?? -1;
-    existingCocktail.description = description;
-    existingCocktail.ingredients = ingredients;
-    existingCocktail.isAlcoholic = isAlcoholic;
-    if (imageFile != null) {
-      existingCocktail.image =
-          String.fromCharCodes(imageFile.readAsBytesSync());
-    }
+      existingCocktail.name = name;
+      existingCocktail.length = length ?? -1;
+      existingCocktail.description = description;
+      existingCocktail.ingredients = ingredients;
+      existingCocktail.isAlcoholic = isAlcoholic;
+      existingCocktail.image = imageFile != null
+          ? String.fromCharCodes(imageFile.readAsBytesSync())
+          : null;
 
-    await isar.writeTxn(() async {
-      isar.cocktails.put(existingCocktail);
-    });
-    loadCocktails();
+      await isar.writeTxn(() async {
+        isar.cocktails.put(existingCocktail);
+      });
+      loadCocktails();
+    } catch (e) {
+      emit(const FailureState<CocktailListStateData>(
+          message: "Error while trying to update cocktail"));
+      if (kDebugMode) {
+        print(e);
+      }
+    }
   }
 
   void addCocktail(String name, int? length, String? description,
       List<Ingredient> ingredients, bool isAlcoholic, File? imageFile) async {
-    Uint8List? imageBytes;
-    if (imageFile != null) {
-      imageBytes = imageFile.readAsBytesSync();
+    try {
+      Uint8List? imageBytes;
+      if (imageFile != null) {
+        imageBytes = imageFile.readAsBytesSync();
+      }
+
+      final cocktail = Cocktail(
+          name: name,
+          length: length ?? -1,
+          description: description,
+          ingredients: ingredients,
+          isAlcoholic: isAlcoholic,
+          image: imageBytes != null ? String.fromCharCodes(imageBytes) : null);
+      await isar.writeTxn(() async {
+        isar.cocktails.put(cocktail);
+      });
+
+      loadCocktails();
+    } catch (e) {
+      emit(const FailureState<CocktailListStateData>(
+          message: "Error while trying to add cocktail"));
+      if (kDebugMode) {
+        print(e);
+      }
     }
-
-    final cocktail = Cocktail(
-        name: name,
-        length: length ?? -1,
-        description: description,
-        ingredients: ingredients,
-        isAlcoholic: isAlcoholic,
-        image: imageBytes != null ? String.fromCharCodes(imageBytes) : null);
-    await isar.writeTxn(() async {
-      isar.cocktails.put(cocktail);
-    });
-
-    loadCocktails();
   }
 }
